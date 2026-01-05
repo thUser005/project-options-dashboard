@@ -4,7 +4,7 @@ import os
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URL")
+MONGO_URI = os.getenv("MONGO_URL",'MONGO_URL')
 DB_NAME = "options_data"
 COL_NAME = "symbols_structural"
 
