@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Options Live Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-4">
+
+    <h3>📈 Options Live Monitor</h3>
+
+    <!-- 🔐 TOKEN STATUS BOX -->
+    <div id="tokenBox" class="alert alert-warning d-none">
+        ⚠️ Upstox Access Token expired or missing.
+        <button class="btn btn-sm btn-danger ms-2" onclick="openTokenPage()">
+            Generate Token
+        </button>
+    </div>
+
+    <!-- SEARCH -->
+    <form method="POST" class="mb-4">
+        <input
+            class="form-control mb-2"
+            name="alert_text"
+            placeholder="SENSEX 08 JAN 85200 PE"
+            value="{{ request.form.alert_text if request.method == 'POST' else '' }}"
+            required
+        >
+        <button class="btn btn-primary">Search</button>
+    </form>
+
+    <!-- MATCHING CONTRACTS -->
+    {% if matches %}
+    <h5>Matching Contracts</h5>
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Instrument</th>
+                <th>Trading Symbol</th>
+                <th>LTP</th>
+                <th>ATM</th>
+                <th>Spot</th>
+                <th>Create Alert</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for m in matches %}
+        <tr>
+            <td>{{ m.instrument_key }}</td>
+            <td>{{ m.trading_symbol }}</td>
+            <td id="ltp-{{ m.instrument_key }}">--</td>
+            <td>{{ m.atm }}</td>
+            <td>{{ m.spot }}</td>
+            <td>
+                <form method="POST" action="/create_alert">
+
+                    <!-- REQUIRED EXISTING -->
+                    <input type="hidden" name="instrument_key" value="{{ m.instrument_key }}">
+
+                    <!-- ✅ NEW (SAFE ADDITIONS) -->
+                    <input type="hidden" name="alert_text" value="{{ request.form.alert_text }}">
+                    <input type="hidden" name="trading_symbol" value="{{ m.trading_symbol }}">
+
+                    <input class="form-control mb-1" name="breakout" placeholder="Breakout" required>
+                    <input class="form-control mb-1" name="target" placeholder="Target" required>
+                    <input class="form-control mb-1" name="stoploss" placeholder="Stoploss" required>
+
+                    <button class="btn btn-success btn-sm">Create</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- SAVED ALERTS -->
+    {% if saved_alerts %}
+    <h5 class="mt-5">Saved Alerts</h5>
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Instrument</th>
+                <th>LTP</th>
+                <th>Breakout</th>
+                <th>Target</th>
+                <th>Stoploss</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for a in saved_alerts %}
+        <tr>
+            <td>{{ a.instrument_key }}</td>
+            <td id="ltp-{{ a.instrument_key }}">--</td>
+            <td>{{ a.breakout }}</td>
+            <td>{{ a.target }}</td>
+            <td>{{ a.stoploss }}</td>
+            <td>{{ a.status }}</td>
+            <td>
+                <form method="POST" action="/delete_alert/{{ a._id }}">
+                    <button class="btn btn-danger btn-sm">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+</div>
+
+<script>
+/* ===============================
+   EXISTING LTP REFRESH (UNCHANGED)
+================================= */
+function refreshLTP() {
+    document.querySelectorAll("[id^='ltp-']").forEach(el => {
+        const key = el.id.replace("ltp-", "");
+        fetch(`/ltp/${key}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.ltp !== undefined && data.ltp !== null) {
+                    el.innerText = data.ltp.toFixed(2);
+                }
+            });
+    });
+}
+setInterval(refreshLTP, 1000);
+
+/* ===============================
+   🔐 TOKEN MANAGEMENT (UNCHANGED)
+================================= */
+const TOKEN_KEY = "UPSTOX_ACCESS_TOKEN";
+const TOKEN_TS_KEY = "UPSTOX_ACCESS_TOKEN_TS";
+const TOKEN_VALIDITY = 24 * 60 * 60 * 1000;
+
+async function checkToken() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const ts = localStorage.getItem(TOKEN_TS_KEY);
+
+    if (token && ts && (Date.now() - ts < TOKEN_VALIDITY)) {
+        return;
+    }
+
+    const res = await fetch("/token/status");
+    const data = await res.json();
+
+    if (!data.exists || data.expired) {
+        document.getElementById("tokenBox").classList.remove("d-none");
+    }
+}
+
+function openTokenPage() {
+    window.location.href = "/token";
+}
+
+checkToken();
+</script>
+
+</body>
+</html>

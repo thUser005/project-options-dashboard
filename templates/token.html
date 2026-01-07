@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upstox Token Setup</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+
+    <h4>🔐 Generate Upstox Access Token</h4>
+
+    <!-- STEP 1 -->
+    <div class="mt-4">
+        <b>Step 1:</b> Open the Upstox login page:
+        <br>
+        <a href="{{ website_url }}" target="_blank">
+            {{ website_url }}
+        </a>
+    </div>
+
+    <!-- MOBILE NUMBER COPY -->
+    {% if mobile_num %}
+    <div class="mt-3">
+        <b>Registered Mobile Number:</b>
+        <div class="input-group mt-1" style="max-width: 300px;">
+            <input
+                id="mobileInput"
+                class="form-control"
+                value="{{ mobile_num }}"
+                readonly
+            >
+            <button
+                id="copyBtn"
+                class="btn btn-outline-secondary"
+                onclick="copyMobile()"
+            >
+                📋 Copy
+            </button>
+        </div>
+        <small class="text-muted">
+            Use this number to login faster on Upstox
+        </small>
+    </div>
+    {% endif %}
+
+    <!-- STEP 2 -->
+    <div class="mt-4">
+        <b>Step 2:</b> Login to Upstox and copy the
+        <code>access_token</code>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="mt-3">
+        <b>Step 3:</b> Paste the token below and save
+    </div>
+
+    <!-- TOKEN INPUT -->
+    <form method="POST" action="/token/save" class="mt-4">
+        <input
+            class="form-control mb-3"
+            name="access_token"
+            placeholder="Paste Upstox access token here"
+            required
+        >
+
+        <button class="btn btn-success">
+            Save Token
+        </button>
+
+        <a href="/" class="btn btn-secondary ms-2">
+            Back
+        </a>
+    </form>
+
+</div>
+
+<script>
+function copyMobile() {
+    const input = document.getElementById("mobileInput");
+    const btn = document.getElementById("copyBtn");
+
+    try {
+        input.select();
+        input.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(input.value);
+
+        // ✅ Success state
+        btn.classList.remove("btn-outline-secondary", "btn-danger");
+        btn.classList.add("btn-success");
+        btn.innerText = "✓ Copied";
+
+    } catch (err) {
+        // ❌ Error state
+        btn.classList.remove("btn-outline-secondary", "btn-success");
+        btn.classList.add("btn-danger");
+        btn.innerText = "✗ Error";
+    }
+
+    // 🔄 Reset after 2 seconds
+    setTimeout(() => {
+        btn.classList.remove("btn-success", "btn-danger");
+        btn.classList.add("btn-outline-secondary");
+        btn.innerText = "📋 Copy";
+    }, 2000);
+}
+</script>
+
+</body>
+</html>

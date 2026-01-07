@@ -1,6 +1,40 @@
+# =========================
+# Web / Server
+# =========================
+flask
+gunicorn
 fastapi
 uvicorn
 aiohttp
 python-dotenv
 jinja2
+flask-cors
+flask-compress
+
+# =========================
+# HTTP / Parsing
+# =========================
+requests
+beautifulsoup4
+
+# =========================
+# Database
+# =========================
 pymongo
+
+# =========================
+# Telegram Bot
+# =========================
+python-telegram-bot
+
+# =========================
+# Upstox API (CRITICAL)
+# =========================
+upstox-python-sdk
+urllib3
+websocket-client
+
+# =========================
+# Environment & Time
+# =========================
+pytz
