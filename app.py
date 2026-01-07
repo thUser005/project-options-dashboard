@@ -324,7 +324,7 @@ def is_colab_enabled():
 if __name__ == "__main__":
     threading.Thread(target=alert_monitor, daemon=True).start()
 
-    PORT = get_free_port()
+    PORT = 5000
     print(f"🚀 Server running at http://127.0.0.1:{PORT}")
 
     threading.Thread(
