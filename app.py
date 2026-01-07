@@ -304,6 +304,14 @@ def get_free_port():
     return port
 
 # ======================================================
+# MANUAL COLAB FLAG
+# ======================================================
+def is_colab_enabled():
+    if len(sys.argv) > 1:
+        return sys.argv[1].lower() == "true"
+    return False
+
+# ======================================================
 # MAIN
 # ======================================================
 if __name__ == "__main__":
@@ -322,11 +330,20 @@ if __name__ == "__main__":
         daemon=True
     ).start()
 
-    if running_in_colab():
+    # 🔥 MANUAL FLAG CONTROL
+    if is_colab_enabled():
+        print("☁️ Colab mode ENABLED (manual flag)")
         install_cloudflared()
         _, public_url = start_cloudflare_tunnel(PORT)
+
         if public_url:
             send_public_url_to_telegram(public_url)
+            print("✅ Public URL sent to Telegram")
+        else:
+            print("❌ Failed to get public URL")
+
+    else:
+        print("🖥️ Normal mode (no tunnel)")
 
     while True:
         time.sleep(5)
