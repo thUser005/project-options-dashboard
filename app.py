@@ -7,6 +7,7 @@ import subprocess
 import shutil
 import re
 from functools import wraps
+import asyncio
 
 import upstox_client
 from flask import Flask, render_template, request, redirect, url_for, jsonify
@@ -57,28 +58,42 @@ tokens_col = db["upstox_tokens"]
 WEBSITE_URL = os.getenv("WEBSITE_URL")
 
 # ======================================================
-# RETRY DECORATOR (MAX 3)
+# RETRY DECORATOR (MAX 3)  ✅ FIXED
 # ======================================================
 def retry_safe(max_retries=3, delay=1):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            for i in range(max_retries):
+            for attempt in range(1, max_retries + 1):
                 try:
                     return fn(*args, **kwargs)
                 except Exception as e:
-                    print(f"⚠️ {fn.__name__} failed ({i+1}/{max_retries}): {e}")
-                    if i == max_retries - 1:
+                    print(f"⚠️ {fn.__name__} failed ({attempt}/{max_retries}): {e}")
+                    if attempt == max_retries:
                         return None
                     time.sleep(delay)
         return wrapper
     return decorator
 
 # ======================================================
-# COLAB DETECTION
+# SEND PUBLIC URL TO TELEGRAM (ASYNC SAFE, SINGLE VERSION) ✅ FIXED
 # ======================================================
-def running_in_colab():
-    return "google.colab" in sys.modules
+@retry_safe()
+def send_public_url_to_telegram(url):
+    async def _send():
+        from telegram import Bot
+        bot = Bot(os.getenv("TELEGRAM_BOT_TOKEN"))
+        await bot.send_message(
+            chat_id=os.getenv("TELEGRAM_CHAT_ID"),
+            text=f"🌍 Public App URL:\n{url}"
+        )
+
+    try:
+        asyncio.run(_send())
+    except RuntimeError:
+        # Jupyter / Colab event loop already running
+        loop = asyncio.get_event_loop()
+        loop.create_task(_send())
 
 # ======================================================
 # CLOUDFLARE INSTALL
@@ -86,11 +101,13 @@ def running_in_colab():
 def install_cloudflared():
     if shutil.which("cloudflared"):
         return
+
     subprocess.run([
         "curl", "-fsSL",
         "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64",
         "-o", "cloudflared"
     ], check=True)
+
     subprocess.run(["chmod", "+x", "cloudflared"], check=True)
 
 # ======================================================
@@ -107,6 +124,7 @@ def start_cloudflare_tunnel(port):
 
     public_url = None
     for line in iter(proc.stdout.readline, ""):
+        print("[Cloudflare]", line.strip())
         if "trycloudflare.com" in line:
             match = re.search(r"https://[a-zA-Z0-9\-]+\.trycloudflare\.com", line)
             if match:
@@ -115,18 +133,6 @@ def start_cloudflare_tunnel(port):
                 break
 
     return proc, public_url
-
-# ======================================================
-# SEND URL TO TELEGRAM (ONCE)
-# ======================================================
-@retry_safe()
-def send_public_url_to_telegram(url):
-    from telegram import Bot
-    bot = Bot(os.getenv("TELEGRAM_BOT_TOKEN"))
-    bot.send_message(
-        chat_id=os.getenv("TELEGRAM_CHAT_ID"),
-        text=f"🌍 Public App URL:\n{url}"
-    )
 
 # ======================================================
 # ACCESS TOKEN MANAGER (UNCHANGED LOGIC)
@@ -287,6 +293,7 @@ def token_status():
     doc = tokens_col.find_one(sort=[("created_at", -1)])
     if not doc:
         return jsonify({"exists": False, "expired": True})
+
     return jsonify({
         "exists": True,
         "expired": (time.time() - doc["created_at"]) > TOKEN_VALIDITY,
@@ -330,7 +337,6 @@ if __name__ == "__main__":
         daemon=True
     ).start()
 
-    # 🔥 MANUAL FLAG CONTROL
     if is_colab_enabled():
         print("☁️ Colab mode ENABLED (manual flag)")
         install_cloudflared()
