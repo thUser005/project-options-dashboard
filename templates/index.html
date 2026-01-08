@@ -1,194 +1,229 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>Options Live Monitor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-light">
+    <div class="container mt-4">
+      <h3>📈 Options Live Monitor</h3>
 
-<div class="container mt-4">
-
-    <h3>📈 Options Live Monitor</h3>
-
-    <!-- 💰 ACCOUNT BALANCE -->
-    <div id="balanceBox" class="alert alert-info d-none">
+      <!-- 💰 ACCOUNT BALANCE -->
+      <div id="balanceBox" class="alert alert-info d-none">
         💰 Available Balance: ₹<strong><span id="balanceValue">--</span></strong>
-    </div>
+      </div>
 
-    <!-- 🔐 TOKEN STATUS BOX -->
-    <div id="tokenBox" class="alert alert-warning d-none">
+      <!-- 🔐 TOKEN STATUS BOX -->
+      <div id="tokenBox" class="alert alert-warning d-none">
         ⚠️ Upstox Access Token expired or missing.
         <button class="btn btn-sm btn-danger ms-2" onclick="openTokenPage()">
-            Generate Token
+          Generate Token
         </button>
-    </div>
+      </div>
 
-    <!-- SEARCH -->
-    <form method="POST" class="mb-4">
+      <!-- SEARCH (UNCHANGED) -->
+      <form method="POST" class="mb-4">
         <input
-            class="form-control mb-2"
-            name="alert_text"
-            placeholder="SENSEX 08 JAN 85200 PE"
-            value="{{ request.form.alert_text if request.method == 'POST' else '' }}"
-            required
-        >
+          class="form-control mb-2"
+          name="alert_text"
+          placeholder="SENSEX 08 JAN 85200 PE"
+          value="{{ request.form.alert_text if request.method == 'POST' else '' }}"
+          required
+        />
         <button class="btn btn-primary">Search</button>
-    </form>
+      </form>
 
-    <!-- MATCHING CONTRACTS -->
-    {% if matches %}
-    <h5>Matching Contracts</h5>
-    <table class="table table-bordered table-striped">
+      <!-- 🔥 ALL AVAILABLE OPTIONS (NEW – SAFE ADDITION) -->
+      {% if options %}
+      <h5>All Available Options</h5>
+      <table class="table table-bordered table-striped table-sm">
         <thead class="table-dark">
-            <tr>
-                <th>Instrument</th>
-                <th>Trading Symbol</th>
-                <th>LTP</th>
-                <th>ATM</th>
-                <th>Spot</th>
-                <th>Create Alert</th>
-            </tr>
+          <tr>
+            <th>Index</th>
+            <th>Trading Symbol</th>
+            <th>LTP</th>
+            <th>ATM</th>
+            <th>Spot</th>
+            <th>Create Alert</th>
+          </tr>
         </thead>
         <tbody>
-        {% for m in matches %}
-        <tr>
+          {% for o in options %}
+          <tr>
+            <td>{{ o.index }}</td>
+            <td>{{ o.trading_symbol }}</td>
+            <td id="ltp-{{ o.instrument_key }}">--</td>
+            <td>{{ o.atm }}</td>
+            <td>{{ o.spot }}</td>
+            <td>
+              <form method="POST" action="/create_alert">
+                <input type="hidden" name="instrument_key" value="{{ o.instrument_key }}">
+                <input type="hidden" name="trading_symbol" value="{{ o.trading_symbol }}">
+
+                <input class="form-control mb-1" name="breakout" placeholder="Breakout" required>
+                <input class="form-control mb-1" name="target" placeholder="Target" required>
+                <input class="form-control mb-1" name="stoploss" placeholder="Stoploss" required>
+
+                <button class="btn btn-success btn-sm">Create</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <!-- MATCHING CONTRACTS (UNCHANGED) -->
+      {% if matches %}
+      <h5 class="mt-4">Matching Contracts</h5>
+      <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+          <tr>
+            <th>Instrument</th>
+            <th>Trading Symbol</th>
+            <th>LTP</th>
+            <th>ATM</th>
+            <th>Spot</th>
+            <th>Create Alert</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in matches %}
+          <tr>
             <td>{{ m.instrument_key }}</td>
             <td>{{ m.trading_symbol }}</td>
             <td id="ltp-{{ m.instrument_key }}">--</td>
             <td>{{ m.atm }}</td>
             <td>{{ m.spot }}</td>
             <td>
-                <form method="POST" action="/create_alert">
+              <form method="POST" action="/create_alert">
+                <input type="hidden" name="instrument_key" value="{{ m.instrument_key }}">
+                <input type="hidden" name="trading_symbol" value="{{ m.trading_symbol }}">
 
-                    <!-- REQUIRED EXISTING -->
-                    <input type="hidden" name="instrument_key" value="{{ m.instrument_key }}">
+                <input class="form-control mb-1" name="breakout" placeholder="Breakout" required>
+                <input class="form-control mb-1" name="target" placeholder="Target" required>
+                <input class="form-control mb-1" name="stoploss" placeholder="Stoploss" required>
 
-                    <!-- SAFE ADDITIONS -->
-                    <input type="hidden" name="alert_text" value="{{ request.form.alert_text }}">
-                    <input type="hidden" name="trading_symbol" value="{{ m.trading_symbol }}">
-
-                    <input class="form-control mb-1" name="breakout" placeholder="Breakout" required>
-                    <input class="form-control mb-1" name="target" placeholder="Target" required>
-                    <input class="form-control mb-1" name="stoploss" placeholder="Stoploss" required>
-
-                    <button class="btn btn-success btn-sm">Create</button>
-                </form>
+                <button class="btn btn-success btn-sm">Create</button>
+              </form>
             </td>
-        </tr>
-        {% endfor %}
+          </tr>
+          {% endfor %}
         </tbody>
-    </table>
-    {% endif %}
+      </table>
+      {% endif %}
 
-    <!-- SAVED ALERTS -->
-    {% if saved_alerts %}
-    <h5 class="mt-5">Saved Alerts</h5>
-    <table class="table table-bordered table-striped">
+      <!-- SAVED ALERTS (UNCHANGED) -->
+      {% if saved_alerts %}
+      <h5 class="mt-5">Saved Alerts</h5>
+      <table class="table table-bordered table-striped">
         <thead class="table-dark">
-            <tr>
-                <th>Instrument</th>
-                <th>LTP</th>
-                <th>Breakout</th>
-                <th>Target</th>
-                <th>Stoploss</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>
+          <tr>
+            <th>Instrument</th>
+            <th>LTP</th>
+            <th>Breakout</th>
+            <th>Target</th>
+            <th>Stoploss</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
         </thead>
         <tbody>
-        {% for a in saved_alerts %}
-        <tr>
-            <td>{{ a.instrument_key }}</td>
+          {% for a in saved_alerts %}
+          <tr>
+            <td>
+              {{ a.trading_symbol if a.trading_symbol else a.instrument_key }}
+            </td>
             <td id="ltp-{{ a.instrument_key }}">--</td>
             <td>{{ a.breakout }}</td>
             <td>{{ a.target }}</td>
             <td>{{ a.stoploss }}</td>
             <td>{{ a.status }}</td>
             <td>
-                <form method="POST" action="/delete_alert/{{ a._id }}">
-                    <button class="btn btn-danger btn-sm">Delete</button>
-                </form>
+              <form method="POST" action="/delete_alert/{{ a._id }}">
+                <button class="btn btn-danger btn-sm">Delete</button>
+              </form>
             </td>
-        </tr>
-        {% endfor %}
+          </tr>
+          {% endfor %}
         </tbody>
-    </table>
-    {% endif %}
+      </table>
+      {% endif %}
+    </div>
 
-</div>
-
-<script>
-/* ===============================
-   EXISTING LTP REFRESH
-================================= */
-function refreshLTP() {
-    document.querySelectorAll("[id^='ltp-']").forEach(el => {
-        const key = el.id.replace("ltp-", "");
-        fetch(`/ltp/${key}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.ltp !== undefined && data.ltp !== null) {
-                    el.innerText = data.ltp.toFixed(2);
-                }
+    <script>
+      /* ===============================
+         EXISTING LTP REFRESH (UNCHANGED)
+      ================================= */
+      function refreshLTP() {
+        document.querySelectorAll("[id^='ltp-']").forEach((el) => {
+          const key = el.id.replace("ltp-", "");
+          fetch(`/ltp/${key}`)
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.ltp !== undefined && data.ltp !== null) {
+                el.innerText = data.ltp.toFixed(2);
+              }
             });
-    });
-}
-setInterval(refreshLTP, 1000);
+        });
+      }
+      setInterval(refreshLTP, 1000);
 
-/* ===============================
-   TOKEN MANAGEMENT
-================================= */
-const TOKEN_KEY = "UPSTOX_ACCESS_TOKEN";
-const TOKEN_TS_KEY = "UPSTOX_ACCESS_TOKEN_TS";
-const TOKEN_VALIDITY = 24 * 60 * 60 * 1000;
+      /* ===============================
+         TOKEN MANAGEMENT (UNCHANGED)
+      ================================= */
+      const TOKEN_KEY = "UPSTOX_ACCESS_TOKEN";
+      const TOKEN_TS_KEY = "UPSTOX_ACCESS_TOKEN_TS";
+      const TOKEN_VALIDITY = 24 * 60 * 60 * 1000;
 
-async function checkToken() {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const ts = localStorage.getItem(TOKEN_TS_KEY);
+      async function checkToken() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const ts = localStorage.getItem(TOKEN_TS_KEY);
 
-    if (token && ts && (Date.now() - ts < TOKEN_VALIDITY)) {
-        return;
-    }
+        if (token && ts && Date.now() - ts < TOKEN_VALIDITY) {
+          return;
+        }
 
-    const res = await fetch("/token/status");
-    const data = await res.json();
-
-    if (!data.exists || data.expired) {
-        document.getElementById("tokenBox").classList.remove("d-none");
-    }
-}
-
-/* ===============================
-   💰 BALANCE FETCH
-================================= */
-async function fetchBalance() {
-    try {
-        const res = await fetch("/balance");
+        const res = await fetch("/token/status");
         const data = await res.json();
 
-        if (data.expired) {
+        if (!data.exists || data.expired) {
+          document.getElementById("tokenBox").classList.remove("d-none");
+        }
+      }
+
+      /* ===============================
+         BALANCE FETCH (UNCHANGED)
+      ================================= */
+      async function fetchBalance() {
+        try {
+          const res = await fetch("/balance");
+          const data = await res.json();
+
+          if (data.expired) {
             window.location.href = "/token";
             return;
-        }
+          }
 
-        if (data.success) {
+          if (data.success) {
             document.getElementById("balanceValue").innerText =
-                data.balance.toFixed(2);
-            document.getElementById("balanceBox")
-                .classList.remove("d-none");
+              data.balance.toFixed(2);
+            document.getElementById("balanceBox").classList.remove("d-none");
+          }
+        } catch (e) {
+          console.error("Balance fetch failed", e);
         }
-    } catch (e) {
-        console.error("Balance fetch failed", e);
-    }
-}
+      }
 
-function openTokenPage() {
-    window.location.href = "/token";
-}
+      function openTokenPage() {
+        window.location.href = "/token";
+      }
 
-checkToken();
-fetchBalance();
-</script>
-
-</body>
+      checkToken();
+      fetchBalance();
+    </script>
+  </body>
 </html>

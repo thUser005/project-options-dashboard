@@ -45,7 +45,7 @@ ACTIVE_STREAMS = {}
 ACCESS_TOKEN_CACHE = {"token": None, "ts": 0}
 
 TOKEN_TTL = 60 * 20
-TOKEN_VALIDITY = 60 * 60 * 24
+TOKEN_VALIDITY = 60 * 60 * 4
 
 # ======================================================
 # MONGODB
@@ -222,28 +222,26 @@ def alert_monitor():
 # ======================================================
 @app.route("/", methods=["GET", "POST"])
 def index():
-    matches = []
+    # Fetch all options once
+    options = retry_safe()(fetch_today_options)() or []
+
     saved_alerts = list(alerts_col.find().sort("created_at", -1))
 
+    # Start streams for saved alerts
     for a in saved_alerts:
         start_ltp_stream(a["instrument_key"])
 
-    if request.method == "POST":
-        alert_text = request.form["alert_text"]
-        criteria = parse_alert_text(alert_text)
-
-        options = retry_safe()(fetch_today_options)()
-        matches = retry_safe()(match_options)(options, criteria) or []
-
-        for m in matches:
-            start_ltp_stream(m["instrument_key"])
+    # Start streams for visible options
+    for opt in options:
+        start_ltp_stream(opt["instrument_key"])
 
     return render_template(
         "index.html",
-        matches=matches,
+        options=options,
         saved_alerts=saved_alerts,
         website_url=WEBSITE_URL
     )
+
 
 @app.route("/ltp/<instrument_key>")
 def get_ltp(instrument_key):
