@@ -10,6 +10,11 @@
 
     <h3>📈 Options Live Monitor</h3>
 
+    <!-- 💰 ACCOUNT BALANCE -->
+    <div id="balanceBox" class="alert alert-info d-none">
+        💰 Available Balance: ₹<strong><span id="balanceValue">--</span></strong>
+    </div>
+
     <!-- 🔐 TOKEN STATUS BOX -->
     <div id="tokenBox" class="alert alert-warning d-none">
         ⚠️ Upstox Access Token expired or missing.
@@ -58,7 +63,7 @@
                     <!-- REQUIRED EXISTING -->
                     <input type="hidden" name="instrument_key" value="{{ m.instrument_key }}">
 
-                    <!-- ✅ NEW (SAFE ADDITIONS) -->
+                    <!-- SAFE ADDITIONS -->
                     <input type="hidden" name="alert_text" value="{{ request.form.alert_text }}">
                     <input type="hidden" name="trading_symbol" value="{{ m.trading_symbol }}">
 
@@ -114,7 +119,7 @@
 
 <script>
 /* ===============================
-   EXISTING LTP REFRESH (UNCHANGED)
+   EXISTING LTP REFRESH
 ================================= */
 function refreshLTP() {
     document.querySelectorAll("[id^='ltp-']").forEach(el => {
@@ -131,7 +136,7 @@ function refreshLTP() {
 setInterval(refreshLTP, 1000);
 
 /* ===============================
-   🔐 TOKEN MANAGEMENT (UNCHANGED)
+   TOKEN MANAGEMENT
 ================================= */
 const TOKEN_KEY = "UPSTOX_ACCESS_TOKEN";
 const TOKEN_TS_KEY = "UPSTOX_ACCESS_TOKEN_TS";
@@ -153,11 +158,36 @@ async function checkToken() {
     }
 }
 
+/* ===============================
+   💰 BALANCE FETCH
+================================= */
+async function fetchBalance() {
+    try {
+        const res = await fetch("/balance");
+        const data = await res.json();
+
+        if (data.expired) {
+            window.location.href = "/token";
+            return;
+        }
+
+        if (data.success) {
+            document.getElementById("balanceValue").innerText =
+                data.balance.toFixed(2);
+            document.getElementById("balanceBox")
+                .classList.remove("d-none");
+        }
+    } catch (e) {
+        console.error("Balance fetch failed", e);
+    }
+}
+
 function openTokenPage() {
     window.location.href = "/token";
 }
 
 checkToken();
+fetchBalance();
 </script>
 
 </body>

@@ -9,11 +9,19 @@ def _get_nearest_expiry(index_name: str) -> str:
     options = fetch_today_options()
     today = date.today()
 
+    index_name = index_name.upper()
     expiries = set()
 
     for opt in options:
-        if index_name in opt["index"]:
-            exp_date = datetime.strptime(opt["expiry"], "%Y-%m-%d").date()
+        # safer index comparison
+        if opt.get("index", "").upper() == index_name:
+            try:
+                exp_date = datetime.strptime(
+                    opt["expiry"], "%Y-%m-%d"
+                ).date()
+            except Exception:
+                continue
+
             if exp_date >= today:
                 expiries.add(exp_date)
 
@@ -31,6 +39,9 @@ def parse_alert_text(text: str):
     2) NIFTY 26400 PE   -> auto nearest expiry
     """
 
+    if not text or not isinstance(text, str):
+        raise ValueError("Alert text must be a valid string")
+
     parts = text.strip().upper().split()
 
     # ===============================
@@ -38,10 +49,17 @@ def parse_alert_text(text: str):
     # ===============================
     if len(parts) == 5:
         index = parts[0]
-        day = int(parts[1])
-        month = parts[2]
-        strike = int(parts[3])
-        option_type = parts[4]
+
+        try:
+            day = int(parts[1])
+            month = parts[2]
+            strike = int(parts[3])
+            option_type = parts[4]
+        except Exception:
+            raise ValueError("Invalid alert values")
+
+        if option_type not in ("CE", "PE"):
+            raise ValueError("Option type must be CE or PE")
 
         year = datetime.now().year
         expiry = datetime.strptime(
@@ -54,8 +72,15 @@ def parse_alert_text(text: str):
     # ===============================
     elif len(parts) == 3:
         index = parts[0]
-        strike = int(parts[1])
+
+        try:
+            strike = int(parts[1])
+        except ValueError:
+            raise ValueError("Strike must be a number")
+
         option_type = parts[2]
+        if option_type not in ("CE", "PE"):
+            raise ValueError("Option type must be CE or PE")
 
         expiry = _get_nearest_expiry(index)
 

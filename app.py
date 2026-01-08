@@ -8,6 +8,7 @@ import shutil
 import re
 from functools import wraps
 import asyncio
+from get_bal import fetch_balance
 
 import upstox_client
 from flask import Flask, render_template, request, redirect, url_for, jsonify
@@ -299,6 +300,39 @@ def token_status():
         "expired": (time.time() - doc["created_at"]) > TOKEN_VALIDITY,
         "created_at": doc["created_at"]
     })
+@app.route("/balance")
+def get_balance():
+    """
+    Fetch current account balance using latest valid token
+    """
+    doc = tokens_col.find_one(sort=[("created_at", -1)])
+    if not doc:
+        return jsonify({"success": False, "expired": True})
+
+    token = doc.get("access_token")
+    if not token:
+        return jsonify({"success": False, "expired": True})
+
+    try:
+        balance = fetch_balance(token)
+
+        # ❌ Token invalid / expired
+        if balance is False:
+            return jsonify({"success": False, "expired": True})
+
+        # ⚠️ Other API issue but token exists
+        if balance is True or balance is None:
+            return jsonify({"success": False, "error": "API_ERROR"})
+
+        # ✅ Valid balance
+        return jsonify({
+            "success": True,
+            "balance": float(balance)
+        })
+
+    except Exception as e:
+        print("⚠️ Balance fetch error:", e)
+        return jsonify({"success": False, "error": "SERVER_ERROR"})
 
 # ======================================================
 # PORT AUTO
