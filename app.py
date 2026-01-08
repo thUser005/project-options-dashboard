@@ -45,7 +45,7 @@ ACTIVE_STREAMS = {}
 ACCESS_TOKEN_CACHE = {"token": None, "ts": 0}
 
 TOKEN_TTL = 60 * 20
-TOKEN_VALIDITY = 60 * 60 * 4
+TOKEN_VALIDITY = 60 * 60 * 2
 
 # ======================================================
 # MONGODB
