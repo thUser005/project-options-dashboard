@@ -139,23 +139,22 @@ def start_cloudflare_tunnel(port):
 # ACCESS TOKEN MANAGER (UNCHANGED LOGIC)
 # ======================================================
 # ======================================================
-# ACCESS TOKEN MANAGER (DETAILED & SAFE)
+# ACCESS TOKEN MANAGER (FINAL AUTHORITY = UPSTOX)
 # ======================================================
 @retry_safe()
 def get_access_token():
     now = time.time()
 
     # ===============================
-    # 1️⃣ In-memory cache check
+    # 1️⃣ In-memory cache
     # ===============================
     if ACCESS_TOKEN_CACHE["token"] and (now - ACCESS_TOKEN_CACHE["ts"] < TOKEN_TTL):
         return ACCESS_TOKEN_CACHE["token"]
 
     # ===============================
-    # 2️⃣ Fetch latest token from DB
+    # 2️⃣ Load latest token from DB
     # ===============================
     doc = tokens_col.find_one(sort=[("created_at", -1)])
-
     if not doc:
         raise RuntimeError("TOKEN_NOT_FOUND")
 
@@ -166,13 +165,14 @@ def get_access_token():
         raise RuntimeError("TOKEN_INVALID_RECORD")
 
     # ===============================
-    # 3️⃣ Time-based expiry check
+    # 3️⃣ Check if token is OLD (soft expiry)
     # ===============================
-    if (now - created_at) >= TOKEN_VALIDITY:
-        raise RuntimeError("TOKEN_EXPIRED_BY_TIME")
+    token_age = now - created_at
+    is_time_expired = token_age >= TOKEN_VALIDITY
 
     # ===============================
-    # 4️⃣ API validation (ONCE ONLY)
+    # 4️⃣ HARD VALIDATION (Upstox)
+    #     ⚠️ Only ONE API call
     # ===============================
     try:
         balance = fetch_balance(token)
@@ -184,12 +184,24 @@ def get_access_token():
     except RuntimeError:
         raise
     except Exception as e:
-        # Do NOT invalidate token for transient API errors
+        # Network / transient API issues
         print("⚠️ Token validation warning:", e)
 
+        # If token is still within time window, allow it
+        if not is_time_expired:
+            ACCESS_TOKEN_CACHE["token"] = token
+            ACCESS_TOKEN_CACHE["ts"] = now
+            return token
+
+        # Otherwise reject
+        raise RuntimeError("TOKEN_VALIDATION_FAILED")
+
     # ===============================
-    # 5️⃣ Cache & return
+    # 5️⃣ Token accepted (even if time-expired)
     # ===============================
+    if is_time_expired:
+        print("⚠️ Token exceeded TTL but still valid via API")
+
     ACCESS_TOKEN_CACHE["token"] = token
     ACCESS_TOKEN_CACHE["ts"] = now
     return token
