@@ -44,8 +44,8 @@ ACTIVE_STREAMS = {}
 
 ACCESS_TOKEN_CACHE = {"token": None, "ts": 0}
 
-TOKEN_TTL = 60 * 20
-TOKEN_VALIDITY = 60 * 60 * 2
+TOKEN_TTL = 60 * 60        # 1 hour cache
+TOKEN_VALIDITY = 60 * 60 * 2   # 2 hours max age (soft)
 
 # ======================================================
 # MONGODB
@@ -145,15 +145,18 @@ def start_cloudflare_tunnel(port):
 def get_access_token():
     now = time.time()
 
-    # ===============================
-    # 1️⃣ In-memory cache
-    # ===============================
-    if ACCESS_TOKEN_CACHE["token"] and (now - ACCESS_TOKEN_CACHE["ts"] < TOKEN_TTL):
+    # ==================================================
+    # 1️⃣ STRONG CACHE (NO DB / NO API)
+    # ==================================================
+    if (
+        ACCESS_TOKEN_CACHE["token"] and
+        (now - ACCESS_TOKEN_CACHE["ts"]) < TOKEN_TTL
+    ):
         return ACCESS_TOKEN_CACHE["token"]
 
-    # ===============================
-    # 2️⃣ Load latest token from DB
-    # ===============================
+    # ==================================================
+    # 2️⃣ LOAD TOKEN FROM DB
+    # ==================================================
     doc = tokens_col.find_one(sort=[("created_at", -1)])
     if not doc:
         raise RuntimeError("TOKEN_NOT_FOUND")
@@ -164,44 +167,35 @@ def get_access_token():
     if not token or not created_at:
         raise RuntimeError("TOKEN_INVALID_RECORD")
 
-    # ===============================
-    # 3️⃣ Check if token is OLD (soft expiry)
-    # ===============================
     token_age = now - created_at
-    is_time_expired = token_age >= TOKEN_VALIDITY
+    is_soft_expired = token_age >= TOKEN_VALIDITY
 
-    # ===============================
-    # 4️⃣ HARD VALIDATION (Upstox)
-    #     ⚠️ Only ONE API call
-    # ===============================
+    # ==================================================
+    # 3️⃣ VALIDATE WITH UPSTOX (ONLY ONCE PER TTL)
+    # ==================================================
     try:
         balance = fetch_balance(token)
 
-        # fetch_balance returns False on 401
         if balance is False:
             raise RuntimeError("TOKEN_EXPIRED_BY_API")
 
     except RuntimeError:
         raise
     except Exception as e:
-        # Network / transient API issues
+        # Network / transient issues
         print("⚠️ Token validation warning:", e)
 
-        # If token is still within time window, allow it
-        if not is_time_expired:
+        # Allow token only if not too old
+        if not is_soft_expired:
             ACCESS_TOKEN_CACHE["token"] = token
             ACCESS_TOKEN_CACHE["ts"] = now
             return token
 
-        # Otherwise reject
         raise RuntimeError("TOKEN_VALIDATION_FAILED")
 
-    # ===============================
-    # 5️⃣ Token accepted (even if time-expired)
-    # ===============================
-    if is_time_expired:
-        print("⚠️ Token exceeded TTL but still valid via API")
-
+    # ==================================================
+    # 4️⃣ CACHE TOKEN FOR 1 HOUR
+    # ==================================================
     ACCESS_TOKEN_CACHE["token"] = token
     ACCESS_TOKEN_CACHE["ts"] = now
     return token
@@ -284,9 +278,9 @@ def index():
     for a in saved_alerts:
         start_ltp_stream(a["instrument_key"])
 
-    # Start streams for visible options
-    for opt in options:
-        start_ltp_stream(opt["instrument_key"])
+    # # Start streams for visible options
+    # for opt in options:
+    #     start_ltp_stream(opt["instrument_key"])
 
     return render_template(
         "index.html",
