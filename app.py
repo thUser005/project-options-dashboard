@@ -138,20 +138,61 @@ def start_cloudflare_tunnel(port):
 # ======================================================
 # ACCESS TOKEN MANAGER (UNCHANGED LOGIC)
 # ======================================================
+# ======================================================
+# ACCESS TOKEN MANAGER (DETAILED & SAFE)
+# ======================================================
 @retry_safe()
 def get_access_token():
     now = time.time()
 
+    # ===============================
+    # 1️⃣ In-memory cache check
+    # ===============================
     if ACCESS_TOKEN_CACHE["token"] and (now - ACCESS_TOKEN_CACHE["ts"] < TOKEN_TTL):
         return ACCESS_TOKEN_CACHE["token"]
 
+    # ===============================
+    # 2️⃣ Fetch latest token from DB
+    # ===============================
     doc = tokens_col.find_one(sort=[("created_at", -1)])
-    if doc and (now - doc["created_at"] < TOKEN_VALIDITY):
-        ACCESS_TOKEN_CACHE["token"] = doc["access_token"]
-        ACCESS_TOKEN_CACHE["ts"] = now
-        return doc["access_token"]
 
-    raise RuntimeError("No valid Upstox access token found")
+    if not doc:
+        raise RuntimeError("TOKEN_NOT_FOUND")
+
+    token = doc.get("access_token")
+    created_at = doc.get("created_at")
+
+    if not token or not created_at:
+        raise RuntimeError("TOKEN_INVALID_RECORD")
+
+    # ===============================
+    # 3️⃣ Time-based expiry check
+    # ===============================
+    if (now - created_at) >= TOKEN_VALIDITY:
+        raise RuntimeError("TOKEN_EXPIRED_BY_TIME")
+
+    # ===============================
+    # 4️⃣ API validation (ONCE ONLY)
+    # ===============================
+    try:
+        balance = fetch_balance(token)
+
+        # fetch_balance returns False on 401
+        if balance is False:
+            raise RuntimeError("TOKEN_EXPIRED_BY_API")
+
+    except RuntimeError:
+        raise
+    except Exception as e:
+        # Do NOT invalidate token for transient API errors
+        print("⚠️ Token validation warning:", e)
+
+    # ===============================
+    # 5️⃣ Cache & return
+    # ===============================
+    ACCESS_TOKEN_CACHE["token"] = token
+    ACCESS_TOKEN_CACHE["ts"] = now
+    return token
 
 # ======================================================
 # LIVE STREAM
